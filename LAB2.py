@@ -11,6 +11,7 @@ import os
 import sys
 import errno
 import threading
+global fan
 
 trl=threading.RLock()
 GAIN=1
@@ -34,7 +35,7 @@ def getGHTmp():
     global table_htmp
     with trl:
         return table_htemp
-def setGLTmp(htemp):
+def setGLTmp(ltemp):
     global table_ltmp
     with trl:
         table_ltmp=ltemp
@@ -52,6 +53,15 @@ def getGVoltage():
     global table_voltage
     with trl:
         return table_voltage
+def setGSetpoint(setpoint):
+    global table_setpoint
+    with trl:
+        table_setpoint=setpoint
+    return
+def getGSetpoint():
+    global table_setpoint
+    with trl:
+        return table_setpoint
 def networkt():
      #initial connection ready, now run continuously
     running = 1
@@ -72,15 +82,21 @@ def networkt():
             running=0
             continue
 def gpioMainClient():
-    temp = getGVoltage()
-    cmd = getGCmd()
-    print("To exit the program please use CTRL+C")
-    fan = fanCtrl(temp, cmd)
-    if (fan == 1):
-        ON = os.system("sudo uhubctl -l 2 -a 1")
-    else:
-        OFF = os.system("sudo uhubctl -l 2 -a 0")
-    time.sleep(int(wait_time))
+    while True:
+        temp = getGVoltage()
+        setpoint = getGSetpoint()
+        cmd = getGCmd()
+        now = datetime.now();
+        today = now.strftime("%Y-%m-%d %H:%M:%S")
+        print("To exit the program please use CTRL+C")
+        fan = fanCtrl(temp, cmd)
+        if fan == 1:
+            ON = os.system("sudo uhubctl -l 2 -a 1")
+            print(today,", Setpoint ="+str(set_temp), ", temp ="+str(temp), ", fan =ON")
+        if fan == 0:
+            OFF = os.system("sudo uhubctl -l 2 -a 0")
+            print(today,", Setpoint ="+str(set_temp), ", temp ="+str(temp), ", fan =OFF")
+        time.sleep(2)
 def rcv(clientsocket):
  msg=""
  error=False
@@ -109,7 +125,17 @@ def snd(clientsocket, msg2send):
     logit(getTs()+" Connection "+outit(clientaddress, "")+" -- Error: general send, dropping connection")
     error=True
  return (error) 
-
+def fanCtrl(temp, cmd):
+    if int(cmd) == -1:
+        fan = 1
+    if int(cmd) == -2:
+        fan = 0
+    if cmd == ""
+        if temp > getGSetpoint():
+            fan = 1
+        if temp < getGSetpoint():
+            fan = 0
+setGLtmp()
 clientsocket = socket(AF_INET, SOCK_STREAM)
 try:
     clientsocket.connect(('localhost', 4000))
@@ -128,20 +154,6 @@ error = rcv(clientsocket)
 if(error):
     clientsocket.close()
 print("Please enter the wait time between: ")
-wait_time = input();
-loop = True
-while loop:
-    print("Please enter the setpoint (Must be between 26330-26340): ")
-    try:
-        set_temp = int(input());
-    except ValueError:
-        print("Please enter a integer")
-        continue
-    if  (set_temp > 26340) or(set_temp < 26330) :
-        print("Please enter between 26330-26340: ")
-        continue
-    else:
-        loop = False
     msg = "Temp: "+str(getGVoltage())+" "+str(getGLTmp())+" "+str(getGHTmp());
     error = snd(clientsocket,msg)
     if(error):
