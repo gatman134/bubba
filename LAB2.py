@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # Program By Daniel batista
 # Made for the Adafruit_ADS1x15
 # Fan controller for maintaining thermistor temperature
@@ -11,11 +12,8 @@ import os
 import sys
 import errno
 import threading
-global fan
 
-trl=threading.RLock()
-GAIN=1
-adc=Adafruit_ADS1x15.ADS1115()
+
 
 def setGCmd(command):
     global table_cmd
@@ -26,22 +24,31 @@ def getGCmd():
     global table_cmd
     with trl:
         return table_cmd
-def setGHTmp(htemp):
-    global table_htmp
+def setGFan(fan):
+    global table_fan
     with trl:
-        table_htmp=htemp
+        table_fan=fan
+    return
+def getGFan():
+    global table_fan
+    with trl:
+        return table_fan
+def setGHTmp(htemp):
+    global table_htemp
+    with trl:
+        table_htemp=htemp
     return
 def getGHTmp():
-    global table_htmp
+    global table_htemp
     with trl:
         return table_htemp
 def setGLTmp(ltemp):
-    global table_ltmp
+    global table_ltemp
     with trl:
-        table_ltmp=ltemp
+        table_ltemp=ltemp
     return
 def getGLTmp():
-    global table_ltmp
+    global table_ltemp
     with trl:
         return table_ltemp
 def setGVoltage(voltage):
@@ -62,80 +69,77 @@ def getGSetpoint():
     global table_setpoint
     with trl:
         return table_setpoint
-def networkt():
+def networkClient():
+    print("Started Network client")
      #initial connection ready, now run continuously
-    running = 1
-    while running:
+    
+    while True:
+        #receive command; command packet=="command: <command>" , where command=(-1==FANOFF, -2==FANON,temp==tempSetpoint)
+        msg = "Temp: "+str(getGVoltage())
+        snd(clientsocket,msg)
+        serverPkt = rcv(clientsocket)
+        if(len(serverPkt.split()) == 1):
+          setGCmd(0)
+        else:
+          setGCmd(int(serverPkt.split()[1]))
+        time.sleep(1)
+         
+
+def gpioMainClient():
+    print("Started GPIO client")
+    while True:
         temp = adc.read_adc(channel=0, gain=GAIN, data_rate=128)
         setGVoltage(temp)
-        # Wait for the response from the server
-        #receive command; command packet=="command: <command>" , where command=(-1==FANOFF, -2==FANON,temp==tempSetpoint)
-        (error, serverPkt) = rcv(clientsocket) #you will receive your command from here
-        setGCmd(serverPkt)
-        if(error):
-            print("ERROR: error after recv")
-            running=0
-            continue
-        #reply to server
-        error = snd(clientsocket,"Temp:"+getGVoltage) #you will need to send the temp here
-        if(error):
-            running=0
-            continue
-def gpioMainClient():
-    while True:
-        temp = getGVoltage()
         setpoint = getGSetpoint()
         cmd = getGCmd()
         now = datetime.now();
         today = now.strftime("%Y-%m-%d %H:%M:%S")
-        print("To exit the program please use CTRL+C")
-        fan = fanCtrl(temp, cmd)
+        
+        fanCtrl(temp, cmd)
+        fan = getGFan()
         if fan == 1:
-            ON = os.system("sudo uhubctl -l 2 -a 1")
-            print(today,", Setpoint ="+str(set_temp), ", temp ="+str(temp), ", fan =ON")
+            subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "1"], stdout = subprocess.DEVNULL)
+            print(today,", Setpoint ="+str(setpoint), ", temp ="+str(temp), ", fan =ON")
         if fan == 0:
-            OFF = os.system("sudo uhubctl -l 2 -a 0")
-            print(today,", Setpoint ="+str(set_temp), ", temp ="+str(temp), ", fan =OFF")
-        time.sleep(2)
+            subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "0"], stdout = subprocess.DEVNULL)
+            print(today,", Setpoint ="+str(setpoint), ", temp ="+str(temp), ", fan =OFF")
+        time.sleep(1)
+        
 def rcv(clientsocket):
- msg=""
- error=False
- try:
     recPkt = clientsocket.recv(1024)
     msg = recPkt.decode('ascii')
- #except socket.error as msg:
- # print "Socket Error: %s" % msg
- except TypeError as msg:
-    logit(getTs()+" Connection "+outit(clientaddress, "")+" -- Error: TypeError non-integer")
-    error=False
- except:
-    logit(getTs()+" Connection "+outit(clientaddress, "")+" -- Error: socket receive, dropping connection")
-    error=True
-    return (error, str(msg))
+    return str(msg)
 def snd(clientsocket, msg2send):
- error=False
- msg=""
- try:
     clientsocket.send(msg2send.encode('ascii'))
- #except socket.error, msg:
- except socket as msg:
-    logit(getTs()+" Connection "+outit(clientaddress, "")+" -- Error: socket send, dropping connection")
-    error=True
- except:
-    logit(getTs()+" Connection "+outit(clientaddress, "")+" -- Error: general send, dropping connection")
-    error=True
- return (error) 
+    return
 def fanCtrl(temp, cmd):
     if int(cmd) == -1:
-        fan = 1
+        setGFan(0)
+        return
     if int(cmd) == -2:
-        fan = 0
-    if cmd == ""
+        setGFan(1)
+        return
+    if int(cmd) == 0:
         if temp > getGSetpoint():
-            fan = 1
+            setGFan(1)
         if temp < getGSetpoint():
-            fan = 0
-setGLtmp()
+            setGFan(0)
+        return
+    else:
+        setGSetpoint(cmd)
+        if temp > int(getGSetpoint()):
+            setGFan(1)
+        if temp < int(getGSetpoint()):
+            setGFan(0)
+
+trl=threading.RLock()
+GAIN=1
+adc=Adafruit_ADS1x15.ADS1115()
+setGFan(1)
+setGCmd(0)
+setGLTmp(26300)
+setGHTmp(26350)
+setGSetpoint(26337)
 clientsocket = socket(AF_INET, SOCK_STREAM)
 try:
     clientsocket.connect(('localhost', 4000))
@@ -145,31 +149,28 @@ except socket:
 except: 
     print("Error: general connection error")
     os._exit(0)
-print("connected! To quit remote, press CTRL-C")
-msg = "NODE: "+str(0);
-error = snd(clientsocket,msg)
-if(error):
-    clientsocket.close()
-error = rcv(clientsocket)
-if(error):
-    clientsocket.close()
-print("Please enter the wait time between: ")
-    msg = "Temp: "+str(getGVoltage())+" "+str(getGLTmp())+" "+str(getGHTmp());
-    error = snd(clientsocket,msg)
-    if(error):
-        clientsocket.close()
-    error = rcv(clientsocket)
-    if(error):
-        clientsocket.close()
+print("connected!")
+msg = "Node: 2";
+snd(clientsocket,msg)
+rcv(clientsocket)
+
+temp = adc.read_adc(channel=0, gain=GAIN, data_rate=128)
+setGVoltage(temp)
+msg = "Temp: "+str(getGVoltage())+" "+str(getGLTmp())+" "+str(getGHTmp());
+snd(clientsocket,msg)
+rcv(clientsocket)
+time.sleep(2)
+print("To quit remote, press CTRL-C")
 
 if __name__ == "__main__":
     print("starting..")
     empty1=""
     empty2=""
-    setGisReady(False)
-    networkt=threading.Thread(target = netThread, args = (empty1, empty2))
+
+    thread1 = threading.Thread(target = networkClient )
+    thread2 = threading. Thread(target = gpioMainClient )
     try:
-        networkt()
-        gpioMainClient()
+        thread1.start()
+        thread2.start()
     except KeyboardInterrupt:
         os._exit(0)
