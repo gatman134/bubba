@@ -82,7 +82,8 @@ def networkClient():
           setGCmd(0)
         else:
           setGCmd(int(serverPkt.split()[1]))
-        time.sleep(1)
+
+        time.sleep(0.5)
          
 
 def gpioMainClient():
@@ -90,12 +91,12 @@ def gpioMainClient():
     while True:
         temp = adc.read_adc(channel=0, gain=GAIN, data_rate=128)
         setGVoltage(temp)
-        setpoint = getGSetpoint()
         cmd = getGCmd()
         now = datetime.now();
         today = now.strftime("%Y-%m-%d %H:%M:%S")
         
         fanCtrl(temp, cmd)
+        setpoint = getGSetpoint()
         fan = getGFan()
         if fan == 1:
             subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "1"], stdout = subprocess.DEVNULL)
@@ -115,9 +116,11 @@ def snd(clientsocket, msg2send):
 def fanCtrl(temp, cmd):
     if int(cmd) == -1:
         setGFan(0)
+        setGSetpoint("FAN_OFF")
         return
     if int(cmd) == -2:
         setGFan(1)
+        setGSetpoint("FAN_ON")
         return
     if int(cmd) == 0:
         if temp > getGSetpoint():
@@ -164,13 +167,12 @@ print("To quit remote, press CTRL-C")
 
 if __name__ == "__main__":
     print("starting..")
-    empty1=""
-    empty2=""
-
     thread1 = threading.Thread(target = networkClient )
     thread2 = threading. Thread(target = gpioMainClient )
     try:
         thread1.start()
         thread2.start()
     except KeyboardInterrupt:
+        thread1.join()
+        theard2.join()
         os._exit(0)
