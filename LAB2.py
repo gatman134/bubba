@@ -100,10 +100,16 @@ def gpioMainClient():
         fan = getGFan()
         if fan == 1:
             subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "1"], stdout = subprocess.DEVNULL)
-            print(today,", Setpoint ="+str(setpoint), ", temp ="+str(temp), ", fan =ON")
+            print(today,", Setpoint="+str(setpoint), ", temp="+str(temp), ", fan=ON")
         if fan == 0:
             subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "0"], stdout = subprocess.DEVNULL)
-            print(today,", Setpoint ="+str(setpoint), ", temp ="+str(temp), ", fan =OFF")
+            print(today,", Setpoint="+str(setpoint), ", temp="+str(temp), ", fan=OFF")
+        if fan == 2:
+            subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "1"], stdout = subprocess.DEVNULL)
+            print(today,", Setpoint=internal="+str(setpoint), ", temp="+str(temp), ", fan=ON")
+        if fan == 3:
+            subprocess.run(["sudo", "/usr/sbin/uhubctl", "-l", "2", "-a", "0"], stdout = subprocess.DEVNULL)
+            print(today,", Setpoint=internal="+str(setpoint), ", temp="+str(temp), ", fan=OFF")
         time.sleep(1)
         
 def rcv(clientsocket):
@@ -124,9 +130,11 @@ def fanCtrl(temp, cmd):
         return
     if int(cmd) == 0:
         if temp > getGSetpoint():
-            setGFan(1)
+            setGSetpoint(26337)
+            setGFan(2)
         if temp < getGSetpoint():
-            setGFan(0)
+            setGSetpoint(26337)
+            setGFan(3)
         return
     else:
         setGSetpoint(cmd)
@@ -138,7 +146,7 @@ def fanCtrl(temp, cmd):
 trl=threading.RLock()
 GAIN=1
 adc=Adafruit_ADS1x15.ADS1115()
-setGFan(1)
+setGFan(2)
 setGCmd(0)
 setGLTmp(26300)
 setGHTmp(26350)
