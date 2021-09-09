@@ -15,51 +15,24 @@ import errno
 import threading
 
 def on_connect(client, userdata, flags, rc):
-    global connected
-    msg="on connect userdata="+str(userdata)+", flags="+str(flags)+", rc="+str(rc)
-    if(rc==0):
-        connected = True
-        (error, mID) = client.subscribe(topic,0) #SUBSCRIBE HERE
-        if(not error==0):
-            MQTT_error = " -- not discernible"
-            if str(error) in mqtterr.keys():
-                MQTT_error = mqtterr.get(str(error))
-            msg="client.subscribe error, error="+str(error)+", MQTT_ERROR="+MQTT_error
-            print(msg)
-    
+    print("Client is connected to node 4")
     return
 def on_message(client, userdata, message): #separate thread
+    print("[Received] Topic: " + message.topic + ", Message: " + message.payload.decode())
     now = datetime.now();
     today = now.strftime("%Y-%m-%d %H:%M:%S")
-    #commXhrl = { '':"No Command", '-1':"FAN OFF", '-2' }
-    payload=message.payload.decode('ascii')
-    payload_list = payload.split(',')
-    if message.topic == "rUI/command/4/remoteUI-default":
-        setGCmd(payload[0])
-        setGTime(payload[1])
-    print(message.topic+"  "+payload)
+    #commXhrl = { '':"No Command", '-1':"FAN OFF", '-2' : "FAN ON" }
+    payload=message.payload.decode()
+    setGCmd(str(payload.split(',')[0]))
     topic ="nodes/command/4"
     payload1 = payload[0]+","+today
     mqttc.publish(topic, payload1)
-    time.sleep(1)
-
-    
-        
+    time.sleep(.1)        
 def on_subscribe(client, userdata, mid, granted_qos):
-    msg="on subscribe: userdata="+str(userdata)+", mid="+str(mid)+",granted_qos="+str(granted_qos)
-    print(msg)
+    print("Subscribed")
     return
 def on_publish(client,userdata,result): #create function for callback
     msg=("DEBUG: on_publish(): client=="+str(client)+"==, userdata=="+str(userdata)+"==,result=="+str(result)+"==eol")
-def setGTime(time):
-    global table_time
-    with trl:
-        table_time=time
-    return
-def getGTime():
-    global table_time
-    with trl:
-        return table_time
 def setGCmd(command):
     global table_cmd
     with trl:
@@ -124,7 +97,7 @@ def gpioMainClient():
         cmd = getGCmd()
         now = datetime.now();
         today = now.strftime("%Y-%m-%d %H:%M:%S")
-        
+
         fanCtrl(temp, cmd)
         setpoint = getGSetpoint()
         fan = getGFan()
@@ -147,24 +120,24 @@ def gpioMainClient():
         time.sleep(1)
         
 def fanCtrl(temp, cmd):
-    if cmd == -1:
+    if cmd == "-":
+        return
+    if cmd == '':
+        setGSetpoint(26337)
+        if temp > int(getGSetpoint()):
+            setGFan(2)
+        if temp < int(getGSetpoint()):
+            setGFan(3)
+        return    
+    if int(cmd) == -1:
         setGFan(0)
         setGSetpoint("FAN_OFF")
         return
-    if cmd == -2:
+    if int(cmd) == -2:
         setGFan(1)
         setGSetpoint("FAN_ON")
         return
-    if cmd == "":
-        if temp > getGSetpoint():
-            setGSetpoint(26337)
-            setGFan(2)
-        if temp < getGSetpoint():
-            setGSetpoint(26337)
-            setGFan(3)
-        return
-    if cmd.isdigit() == False:
-        return
+
     else:
         setGSetpoint(int(float(cmd)))
         if temp > int(getGSetpoint()):
@@ -176,7 +149,7 @@ trl=threading.RLock()
 GAIN=1
 adc=Adafruit_ADS1x15.ADS1115()
 setGFan(2)
-setGCmd(0)
+setGCmd('')
 setGLTmp(26300)
 setGHTmp(26350)
 setGSetpoint(26337)
