@@ -25,7 +25,7 @@ def on_message(client, userdata, message): #separate thread
     payload=message.payload.decode()
     setGCmd(str(payload.split(',')[0]))
     topic ="nodes/command/4"
-    payload1 = payload[0]+","+today
+    payload1 = str(payload.split(',')[0])+","+today
     mqttc.publish(topic, payload1)
     time.sleep(.1)        
 def on_subscribe(client, userdata, mid, granted_qos):
@@ -174,7 +174,8 @@ if __name__ == "__main__":
         
         print("Connecting to " + host + "/" + topic)
         try:
-            mqttc.connect("localhost")
+            mqttc.connect('localhost')
+            #mqttc.connect("ec2-54-193-32-216.us-west-1.compute.amazonaws.com")
             mqttc.subscribe("rUI/command/4/#")
             mqttc.loop_start()
         except Exception as e:
