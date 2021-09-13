@@ -26,7 +26,7 @@ def on_message(client, userdata, message): #separate thread
     setGCmd(str(payload.split(',')[0]))
     topic ="nodes/command/4"
     payload1 = str(payload.split(',')[0])+","+today
-    mqttc.publish(topic, payload1)
+    mqttc.publish(topic, payload1, 2, True)
     time.sleep(.1)        
 def on_subscribe(client, userdata, mid, granted_qos):
     print("Subscribed")
@@ -116,7 +116,7 @@ def gpioMainClient():
         topic = "nodes/temp/4"
         #payload = ”<temp>_<lowRange>_<highRange>,<setTime>”
         payload = str(getGVoltage()) + "_" + str(getGLTmp())+"_"+str(getGHTmp())+","+today
-        mqttc.publish(topic, payload)
+        mqttc.publish(topic, payload, 2, True)
         time.sleep(1)
         
 def fanCtrl(temp, cmd):
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         try:
             mqttc.connect('localhost')
             #mqttc.connect("ec2-54-193-32-216.us-west-1.compute.amazonaws.com")
-            mqttc.subscribe("rUI/command/4/#")
+            mqttc.subscribe("rUI/command/4/#", qos = 2)
             mqttc.loop_start()
         except Exception as e:
             print("Error: exception -- error was: "+str(e))
